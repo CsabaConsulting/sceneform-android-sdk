@@ -52,11 +52,15 @@ public class AugmentedImageFragment extends ArFragment {
 
   // Augmented image configuration and rendering.
   // Load a single image (true) or a pre-generated image database (false).
-  private static final boolean USE_SINGLE_IMAGE = false;
+  private static final boolean USE_SINGLE_IMAGE = true;
 
   // Do a runtime check for the OpenGL level available at runtime to avoid Sceneform crashing the
   // application.
   private static final double MIN_OPENGL_VERSION = 3.0;
+
+  // Uri that stores the path of the target image chosen from device storage.
+  private android.net.Uri chosenImageUri = null;
+  private static final int REQUEST_CODE_CHOOSE_IMAGE = 1;
 
   @Override
   public void onAttach(Context context) {
@@ -79,6 +83,8 @@ public class AugmentedImageFragment extends ArFragment {
       SnackbarHelper.getInstance()
           .showError(getActivity(), "Sceneform requires OpenGL ES 3.0 or later");
     }
+
+    chooseNewImage();
   }
 
   @Override
@@ -96,6 +102,10 @@ public class AugmentedImageFragment extends ArFragment {
   @Override
   protected Config getSessionConfiguration(Session session) {
     Config config = super.getSessionConfiguration(session);
+
+    // Use setFocusMode to configure auto-focus.
+    config.setFocusMode(Config.FocusMode.AUTO);
+
     if (!setupAugmentedImageDatabase(config, session)) {
       SnackbarHelper.getInstance()
           .showError(getActivity(), "Could not setup augmented image database");
@@ -146,11 +156,59 @@ public class AugmentedImageFragment extends ArFragment {
   }
 
   private Bitmap loadAugmentedImageBitmap(AssetManager assetManager) {
-    try (InputStream is = assetManager.open(DEFAULT_IMAGE_NAME)) {
-      return BitmapFactory.decodeStream(is);
-    } catch (IOException e) {
-      Log.e(TAG, "IO exception loading augmented image bitmap.", e);
+    if (chosenImageUri == null) {
+      try (InputStream is = assetManager.open(DEFAULT_IMAGE_NAME)) {
+        return BitmapFactory.decodeStream(is);
+      } catch (IOException e) {
+        Log.e(TAG, "IO exception loading augmented image bitmap.", e);
+      }
+    } else {
+      try (InputStream is = getContext().getContentResolver().openInputStream(chosenImageUri)) {
+        return BitmapFactory.decodeStream(is);
+      } catch (IOException e) {
+        Log.e(TAG, "IO exception loading augmented image bitmap from storage.", e);
+      }
     }
     return null;
+
+//    try (InputStream is = assetManager.open(DEFAULT_IMAGE_NAME)) {
+//      return BitmapFactory.decodeStream(is);
+//    } catch (IOException e) {
+//      Log.e(TAG, "IO exception loading augmented image bitmap.", e);
+//    }
+//    return null;
+  }
+
+  // Function that prompts the user to choose an image from device storage.
+  void chooseNewImage() {
+    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
+    intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+    intent.setType("image/*");
+    startActivityForResult(
+            android.content.Intent.createChooser(intent, "Select target augmented image"),
+            REQUEST_CODE_CHOOSE_IMAGE);
+  }
+
+  // Handle the user-selected image, and to reconfigure the ARCore session in the internal
+  // ArSceneView.
+  @Override
+  public void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+    try {
+      if (resultCode == android.app.Activity.RESULT_OK) {
+        if (requestCode == REQUEST_CODE_CHOOSE_IMAGE) {
+          // Get the Uri of target image
+          chosenImageUri = data.getData();
+
+          // Reconfig ARCore session to use the new image
+          Session arcoreSession = getArSceneView().getSession();
+          Config config = getSessionConfiguration(arcoreSession);
+          config.setUpdateMode(Config.UpdateMode.LATEST_CAMERA_IMAGE);
+          arcoreSession.configure(config);
+        }
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "onActivityResult - target image selection error ", e);
+    }
   }
 }

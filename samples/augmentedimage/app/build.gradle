@@ -50,6 +50,8 @@ dependencies {
     // Use the Sceneform UX Package pre-built from Maven.
     implementation "com.google.ar.sceneform.ux:sceneform-ux:1.12.0"
 
+    implementation 'cz.advel.jbullet:jbullet:20101010-1'
+    implementation 'de.javagl:obj:0.2.1'
     // Use the Sceneform UX Package built from the source files included in the sceneformux folder.
     //api project(":sceneformux")
 }
@@ -75,3 +77,9 @@ sceneform.asset('sampledata/models/frame_upper_right.obj',
         'default',
         'sampledata/models/frame_upper_right.sfa',
         'src/main/assets/models/frame_upper_right')
+
+
+sceneform.asset('sampledata/models/GreenMaze.obj',
+        'default',
+        'sampledata/models/GreenMaze.sfa',
+        'src/main/assets/GreenMaze')

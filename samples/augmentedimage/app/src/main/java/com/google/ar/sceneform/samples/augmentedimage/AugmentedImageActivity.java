@@ -18,6 +18,7 @@ package com.google.ar.sceneform.samples.augmentedimage;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import com.google.ar.core.AugmentedImage;
@@ -28,6 +29,9 @@ import com.google.ar.sceneform.ux.ArFragment;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.google.ar.sceneform.math.Vector3;
+import com.google.ar.core.Pose;
 
 /**
  * This application demonstrates using augmented images to place anchor nodes. app to include image
@@ -41,6 +45,7 @@ import java.util.Map;
  * Images</a>.
  */
 public class AugmentedImageActivity extends AppCompatActivity {
+  private static final String TAG = "AugmentedImageActivity";
 
   private ArFragment arFragment;
   private ImageView fitToScanView;
@@ -48,6 +53,8 @@ public class AugmentedImageActivity extends AppCompatActivity {
   // Augmented image and its associated center pose anchor, keyed by the augmented image in
   // the database.
   private final Map<AugmentedImage, AugmentedImageNode> augmentedImageMap = new HashMap<>();
+
+  private PhysicsController physicsController;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -102,11 +109,42 @@ public class AugmentedImageActivity extends AppCompatActivity {
             node.setImage(augmentedImage);
             augmentedImageMap.put(augmentedImage, node);
             arFragment.getArSceneView().getScene().addChild(node);
+
+            physicsController = new PhysicsController(this);
+          } else {
+            // If the image anchor is already created
+            AugmentedImageNode node = augmentedImageMap.get(augmentedImage);
+            try {
+              node.updateBallPose(physicsController.getBallPose());
+
+//              // Use real world gravity, (0, -10, 0) as gravity
+//              // Convert to Physics world coordinate (because Maze mesh has to be static)
+//              // Use it as a force to move the ball
+//              Pose worldGravityPose = Pose.makeTranslation(0, -10f, 0);
+              // Fun experiment, use camera direction as gravity
+              float cameraZDir[] = frame.getCamera().getPose().getZAxis();
+              Vector3 cameraZVector = new Vector3(cameraZDir[0], cameraZDir[1], cameraZDir[2]);
+              Vector3 cameraGravity = cameraZVector.negated().scaled(10);
+              Pose worldGravityPose = Pose.makeTranslation(
+                      cameraGravity.x, cameraGravity.y, cameraGravity.z);
+
+              Pose mazeGravityPose = augmentedImage.getCenterPose().inverse().compose(worldGravityPose);
+              float mazeGravity[] = mazeGravityPose.getTranslation();
+              physicsController.applyGravityToBall(mazeGravity);
+
+              physicsController.updatePhysics();
+            }
+            catch (NullPointerException e) {
+              Log.e(TAG, "onUpdateFrame TRACKING - could not update ball pose", e);
+            }
           }
           break;
 
         case STOPPED:
+          AugmentedImageNode node = augmentedImageMap.get(augmentedImage);
           augmentedImageMap.remove(augmentedImage);
+          if (node != null)
+            arFragment.getArSceneView().getScene().removeChild(node);
           break;
       }
     }
