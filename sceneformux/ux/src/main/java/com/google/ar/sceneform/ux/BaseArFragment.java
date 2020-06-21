@@ -68,6 +68,19 @@ import java.util.Set;
 public abstract class BaseArFragment extends Fragment
     implements Scene.OnPeekTouchListener, Scene.OnUpdateListener {
   private static final String TAG = BaseArFragment.class.getSimpleName();
+
+  /** Invoked when the ARCore Session is initialized. */
+  public interface OnSessionInitializationListener {
+    /**
+     * The callback will only be invoked once after a Session is initialized and before it is
+     * resumed for the first time.
+     *
+     * @see #setOnSessionInitializationListener(OnTapArPlaneListener)
+     * @param session The ARCore Session.
+     */
+    void onSessionInitialization(Session session);
+  }
+
   /** Invoked when an ARCore plane is tapped. */
   public interface OnTapArPlaneListener {
     /**
@@ -92,6 +105,7 @@ public abstract class BaseArFragment extends Fragment
   private FrameLayout frameLayout;
   private boolean isStarted;
   private boolean canRequestDangerousPermissions = true;
+  @Nullable private OnSessionInitializationListener onSessionInitializationListener;
   @Nullable private OnTapArPlaneListener onTapArPlaneListener;
 
   @SuppressWarnings({"initialization"})
@@ -116,6 +130,17 @@ public abstract class BaseArFragment extends Fragment
    */
   public TransformationSystem getTransformationSystem() {
     return transformationSystem;
+  }
+
+  /**
+   * Registers a callback to be invoked when the ARCore Session is initialized. The callback will
+   * only be invoked once after the Session is initialized and before it is resumed.
+   *
+   * @param onSessionInitializationListener the {@link OnSessionInitializationListener} to attach.
+   */
+  public void setOnSessionInitializationListener(
+      @Nullable OnSessionInitializationListener onSessionInitializationListener) {
+    this.onSessionInitializationListener = onSessionInitializationListener;
   }
 
   /**
@@ -353,6 +378,10 @@ public abstract class BaseArFragment extends Fragment
 
         Session session = createSession();
 
+        if (this.onSessionInitializationListener != null) {
+          this.onSessionInitializationListener.onSessionInitialization(session);
+        }
+
         Config config = getSessionConfiguration(session);
         // Force the non-blocking mode for the session.
 
@@ -384,8 +413,12 @@ public abstract class BaseArFragment extends Fragment
     return session;
   }
 
+  /**
+   * Creates the ARCore Session with the with features defined in #getSessionFeatures. If this
+   * returns null, the Session will be created with the default features.
+   */
   
-  Session createSessionWithFeatures()
+  protected @Nullable Session createSessionWithFeatures()
       throws UnavailableSdkTooOldException, UnavailableDeviceNotCompatibleException,
           UnavailableArcoreNotInstalledException, UnavailableApkTooOldException {
     return new Session(requireActivity(), getSessionFeatures());
@@ -411,6 +444,7 @@ public abstract class BaseArFragment extends Fragment
   protected void setupSelectionRenderable(FootprintSelectionVisualizer selectionVisualizer) {
     ModelRenderable.builder()
         .setSource(getActivity(), R.raw.sceneform_footprint)
+        .setIsFilamentGltf(true)
         .build()
         .thenAccept(
             renderable -> {

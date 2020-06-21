@@ -39,7 +39,9 @@ android {
 }
 
 dependencies {
-    api "com.google.ar.sceneform:core:1.12.0"
+    // Use the Sceneform SDK built from the source files included in the sceneformsrc folder.
+    api project(":sceneform")
+
     implementation "com.android.support:appcompat-v7:28.0.0"
     implementation "com.android.support:design:28.0.0"
 }
@@ -48,25 +50,3 @@ task compileUxAssets {
 }
 
 preBuild.dependsOn compileUxAssets
-
-apply plugin: 'com.google.ar.sceneform.plugin'
-
-sceneform.asset('sampledata/sceneform_footprint.obj',
-        'default',
-        'sampledata/sceneform_footprint.sfa',
-        'src/main/res/raw/sceneform_footprint')
-
-sceneform.asset('sampledata/sceneform_face_mesh.obj',
-        'sampledata/sceneform_face_mesh_material.mat',
-        'sampledata/sceneform_face_mesh.sfa',
-        'src/main/res/raw/sceneform_face_mesh')
-
-sceneform.asset('sampledata/sceneform_face_mesh_occluder.obj',
-        'sampledata/sceneform_face_mesh_occluder_material.mat',
-        'sampledata/sceneform_face_mesh_occluder.sfa',
-        'src/main/res/raw/sceneform_face_mesh_occluder')
-
-// This ensures that sceneform assets are compiled at the right point
-// of the build process, which is necessary when using sceneform
-// in a library instead of an application.
-sceneform.before('compileUxAssets')
